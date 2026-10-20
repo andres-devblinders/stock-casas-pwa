@@ -34,42 +34,10 @@ async function loadInitialData() {
         const data = await ApiService.getInitialData();
         Store.setState({ houses: data.houses, products: data.products });
         updateHouseTabs();
-        showDebugBanner();
         render();
     } catch (err) {
         container.innerHTML = `<div class="text-center text-rose-400 py-8">${err.message}</div>`;
     }
-}
-
-/**
- * Panel de diagnóstico visual TEMPORAL: muestra en pantalla las claves y valores
- * reales que llegan desde la hoja "Configuracion" del Sheet.
- * Borrar esta función una vez confirmadas las claves correctas.
- */
-function showDebugBanner() {
-    const existing = document.getElementById('debug-banner');
-    if (existing) existing.remove();
-
-    const keys = Store.houses ? Object.entries(Store.houses) : [];
-    if (!keys.length) return;
-
-    const banner = document.createElement('div');
-    banner.id = 'debug-banner';
-    banner.style.cssText = `
-        position: fixed; bottom: 80px; left: 8px; right: 8px;
-        background: #1e293b; border: 1px solid #f59e0b; border-radius: 10px;
-        padding: 10px 12px; z-index: 9999; font-family: monospace; font-size: 11px;
-        color: #fbbf24; max-height: 160px; overflow-y: auto;
-    `;
-    banner.innerHTML = `
-        <div style="font-weight:bold;margin-bottom:6px;color:#f59e0b;">
-            🔍 DEBUG – Claves en Store.houses (borrar tras confirmar)
-            <button onclick="document.getElementById('debug-banner').remove()"
-                style="float:right;background:#ef4444;color:white;border:none;border-radius:4px;padding:1px 6px;cursor:pointer;font-size:10px;">✕</button>
-        </div>
-        ${keys.map(([k, v]) => `<div><b>${k}</b>: ${v}</div>`).join('')}
-    `;
-    document.body.appendChild(banner);
 }
 
 
@@ -158,31 +126,13 @@ function updateNavButtons() {
 
 /**
  * Actualiza el textContent de cada botón .tab-house con el nombre real de la
- * casa leído desde Store.houses. Busca la clave de forma case-insensitive
- * para ser robusto ante variaciones del Sheet (NOMBRE_CASA_1, nombre_casa_1…).
+ * casa leído desde Store.houses["NOMBRE_CASA_N"].
  * Si la clave no existe en la configuración, conserva el fallback "Casa N".
  */
 function updateHouseTabs() {
-    // Log de diagnóstico: muestra qué claves llegan realmente desde el Sheet
-    console.log('[updateHouseTabs] Store.houses =', JSON.stringify(Store.houses));
-
-    if (!Store.houses || !Object.keys(Store.houses).length) return;
-
-    // Construir un mapa con todas las claves en mayúsculas para búsqueda insensible
-    const housesUpper = {};
-    Object.entries(Store.houses).forEach(([k, v]) => {
-        housesUpper[k.toUpperCase().replace(/\s+/g, '_')] = v;
-    });
-
+    if (!Store.houses) return;
     document.querySelectorAll('.tab-house').forEach(btn => {
-        const houseNum = btn.dataset.house;
-        // Intentar varias variantes de clave
-        const name =
-            housesUpper[`NOMBRE_CASA_${houseNum}`] ||
-            housesUpper[`CASA_${houseNum}`] ||
-            housesUpper[`NOMBRE_CASA${houseNum}`] ||
-            housesUpper[`HOUSE_${houseNum}`] ||
-            null;
+        const name = Store.houses[`NOMBRE_CASA_${btn.dataset.house}`];
         if (name) btn.textContent = name;
     });
 }
