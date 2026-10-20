@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-900 text-slate-100">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stock & Compra Casas</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="h-full flex flex-col antialiased select-none pb-20">
+
+    <!-- VISTA 1: PANTALLA DE ACCESO (LOGIN) -->
+    <section id="view-login" class="flex-1 flex flex-col justify-center px-6 py-12 max-w-md mx-auto w-full">
+        <div class="bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-700">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold tracking-tight">Stock Multi-Casa</h1>
+                <p class="text-sm text-slate-400 mt-1">Conecta con tu Google Sheet privado</p>
+            </div>
+
+            <form id="form-login" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">URL WebApp (Apps
+                        Script)</label>
+                    <input type="url" id="login-url" required placeholder="https://script.google.com/macros/s/.../exec"
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Usuario</label>
+                    <input type="text" id="login-user" required placeholder="admin"
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">PIN / Contraseña</label>
+                    <input type="password" id="login-pass" required placeholder="••••"
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <button type="submit" id="btn-login-submit"
+                    class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 font-semibold rounded-lg shadow-md transition-colors text-sm">
+                    Conectar y Guardar Sesión
+                </button>
+                <p id="login-error" class="text-xs text-rose-400 text-center hidden"></p>
+            </form>
+        </div>
+    </section>
+
+    <!-- VISTA 2: APLICACIÓN PRINCIPAL (STOCK Y COMPRAS) -->
+    <section id="view-app" class="flex-1 flex flex-col hidden">
+        <!-- Header Fijo -->
+        <header
+            class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex justify-between items-center sticky top-0 z-20">
+            <div>
+                <h2 id="header-title" class="font-bold text-base leading-tight">Inventario</h2>
+                <span id="header-user" class="text-xs text-slate-400">Usuario: admin</span>
+            </div>
+            <button id="btn-logout"
+                class="text-xs text-slate-400 hover:text-rose-400 px-2 py-1 rounded border border-slate-700">
+                Cerrar
+            </button>
+        </header>
+
+        <!-- Subheader: Selector de Casa (Solo visible en pestaña Stock) -->
+        <div id="house-selector" class="bg-slate-900 border-b border-slate-800 p-2 flex gap-2 overflow-x-auto">
+            <button data-house="1"
+                class="tab-house flex-1 py-1.5 px-3 rounded-lg text-xs font-medium bg-indigo-600 text-white whitespace-nowrap">Casa
+                1</button>
+            <button data-house="2"
+                class="tab-house flex-1 py-1.5 px-3 rounded-lg text-xs font-medium bg-slate-800 text-slate-400 whitespace-nowrap">Casa
+                2</button>
+            <button data-house="3"
+                class="tab-house flex-1 py-1.5 px-3 rounded-lg text-xs font-medium bg-slate-800 text-slate-400 whitespace-nowrap">Casa
+                3</button>
+            <button data-house="4"
+                class="tab-house flex-1 py-1.5 px-3 rounded-lg text-xs font-medium bg-slate-800 text-slate-400 whitespace-nowrap">Casa
+                4</button>
+        </div>
+
+        <!-- Contenedor Principal con Scroll -->
+        <main class="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full">
+            <div id="content-container" class="space-y-3">
+                <!-- Contenido renderizado por app.js -->
+            </div>
+        </main>
+
+        <!-- Barra de Navegación Inferior -->
+        <nav class="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 flex justify-around p-2 z-30">
+            <button id="nav-stock" class="flex flex-col items-center flex-1 py-1 text-indigo-400 font-semibold text-xs">
+                <svg class="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                Inventario
+            </button>
+            <button id="nav-shopping"
+                class="flex flex-col items-center flex-1 py-1 text-slate-400 font-semibold text-xs">
+                <svg class="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Lista Compra
+            </button>
+        </nav>
+    </section>
+
+    <script type="module" src="src/app.js"></script>
+</body>
+
+</html>
