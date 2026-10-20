@@ -79,7 +79,11 @@ function setupConfiguracionSheet(ss) {
     ['NOMBRE_CASA_2', 'Casa 2', 'Nombre visible para la ubicación 2'],
     ['NOMBRE_CASA_3', 'Casa 3', 'Nombre visible para la ubicación 3'],
     ['NOMBRE_CASA_4', 'Casa 4', 'Nombre visible para la ubicación 4'],
-    ['CODIGO_POSTAL', '33001', 'Código postal de referencia para catálogos']
+    ['CODIGO_POSTAL', '33001', 'Código postal de referencia para catálogos'],
+    ['NOMBRE_SUPER_1', 'MERCADONA', 'Supermercado 1 (fijo - usa API de precios)'],
+    ['NOMBRE_SUPER_2', 'ALIMERKA', 'Supermercado 2 (configurable)'],
+    ['NOMBRE_SUPER_3', 'LIDL', 'Supermercado 3 (configurable)'],
+    ['NOMBRE_SUPER_4', 'ALDI', 'Supermercado 4 (configurable)']
   ];
 
   sheet.getRange(2, 1, configData.length, configData[0].length).setValues(configData);

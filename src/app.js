@@ -192,6 +192,147 @@ function renderStockView(container) {
     });
 }
 
+/**
+ * Lee los supermercados configurados en Store.houses (claves NOMBRE_SUPER_N).
+ * MERCADONA siempre está incluido como primero (fijo, usa API de precios).
+ * Fallback: lista por defecto si el Sheet aún no tiene las claves.
+ */
+function getSupermarkets() {
+    const supers = [];
+    if (Store.houses) {
+        for (let i = 1; i <= 10; i++) {
+            const val = Store.houses[`NOMBRE_SUPER_${i}`];
+            if (val) supers.push(String(val).toUpperCase().trim());
+        }
+    }
+    // Fallback si el Sheet no tiene claves NOMBRE_SUPER_N todavía
+    if (!supers.length) return ['MERCADONA', 'ALIMERKA', 'LIDL', 'ALDI'];
+    // Garantizar que MERCADONA siempre esté primero
+    const withoutMerca = supers.filter(s => s !== 'MERCADONA');
+    return ['MERCADONA', ...withoutMerca];
+}
+
+/**
+ * Muestra un bottom-sheet modal para elegir el supermercado de un producto.
+ * @param {string} prodId - ID del producto
+ * @param {string} currentPref - Preferencia actual (para marcar la activa)
+ */
+function showSuperModal(prodId, currentPref) {
+    // Eliminar modal previo si existe
+    document.getElementById('super-modal')?.remove();
+
+    const supermarkets = getSupermarkets();
+
+    // Mapa de colores por supermercado conocido
+    const colorMap = {
+        MERCADONA: { bg: '#065f46', border: '#10b981', badge: '🟢' },
+        ALIMERKA:  { bg: '#78350f', border: '#f59e0b', badge: '🟡' },
+        LIDL:      { bg: '#1e3a8a', border: '#60a5fa', badge: '🔵' },
+        ALDI:      { bg: '#164e63', border: '#22d3ee', badge: '🩵' },
+    };
+    const defaultColor = { bg: '#1e293b', border: '#64748b', badge: '⚪' };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'super-modal';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 1000;
+        background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+        display: flex; align-items: flex-end; justify-content: center;
+        animation: fadeIn .15s ease;
+    `;
+
+    const sheet = document.createElement('div');
+    sheet.style.cssText = `
+        background: #0f172a; border-top: 1px solid #334155;
+        border-radius: 20px 20px 0 0; padding: 20px 16px 32px;
+        width: 100%; max-width: 480px;
+        animation: slideUp .2s ease;
+    `;
+
+    // Botones de supermercados
+    const superBtns = supermarkets.map(name => {
+        const c = colorMap[name] || defaultColor;
+        const isActive = currentPref === name;
+        return `
+            <button class="super-opt-btn" data-super="${name}" style="
+                width: 100%; padding: 13px 16px; margin-bottom: 10px;
+                background: ${c.bg}; border: 2px solid ${isActive ? c.border : 'transparent'};
+                border-radius: 12px; color: white; font-size: 15px; font-weight: 600;
+                text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px;
+                transition: border-color .15s, transform .1s; active: scale(.97);
+            ">
+                <span style="font-size:18px">${c.badge}</span>
+                <span>${name}</span>
+                ${isActive ? '<span style="margin-left:auto;font-size:11px;color:' + c.border + ';">✓ Activo</span>' : ''}
+                ${name === 'MERCADONA' ? '<span style="margin-left:auto;font-size:10px;color:#6ee7b7;opacity:.8;">API precios</span>' : ''}
+            </button>`;
+    }).join('');
+
+    sheet.innerHTML = `
+        <div style="width:40px;height:4px;background:#334155;border-radius:4px;margin:0 auto 18px;"></div>
+        <div style="font-size:15px;font-weight:700;color:#e2e8f0;margin-bottom:16px;padding:0 4px;">
+            📍 Fijar supermercado preferido
+        </div>
+        ${superBtns}
+        <button id="super-auto-btn" style="
+            width: 100%; padding: 13px 16px; margin-bottom: 10px;
+            background: #1e293b; border: 2px solid ${!currentPref ? '#6366f1' : 'transparent'};
+            border-radius: 12px; color: #94a3b8; font-size: 14px; font-weight: 500;
+            text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px;
+        ">
+            <span style="font-size:18px">🤖</span>
+            <span>Automático <span style="font-size:11px;opacity:.7;">(menor precio)</span></span>
+            ${!currentPref ? '<span style="margin-left:auto;font-size:11px;color:#818cf8;">✓ Activo</span>' : ''}
+        </button>
+        <button id="super-cancel-btn" style="
+            width: 100%; padding: 11px; background: transparent;
+            border: 1px solid #334155; border-radius: 12px;
+            color: #64748b; font-size: 14px; cursor: pointer; margin-top: 4px;
+        ">Cancelar</button>
+    `;
+
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+
+    // Añadir keyframes si no existen
+    if (!document.getElementById('modal-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'modal-keyframes';
+        style.textContent = `
+            @keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
+            @keyframes slideUp { from { transform:translateY(100%) } to { transform:translateY(0) } }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Cerrar al pulsar el overlay
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById('super-cancel-btn').addEventListener('click', () => overlay.remove());
+
+    // Seleccionar automático
+    document.getElementById('super-auto-btn').addEventListener('click', async () => {
+        overlay.remove();
+        await applyPreference(prodId, '');
+    });
+
+    // Seleccionar supermercado
+    sheet.querySelectorAll('.super-opt-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const chosen = btn.dataset.super;
+            overlay.remove();
+            await applyPreference(prodId, chosen);
+        });
+    });
+}
+
+/** Aplica la preferencia al producto y actualiza la UI */
+async function applyPreference(prodId, superName) {
+    const p = Store.products.find(x => x.id_producto === prodId);
+    if (p) p.super_forzado = superName;
+    render();
+    await ApiService.updatePreference(prodId, superName, null);
+}
+
 function renderShoppingView(container) {
     const missing = Store.getShoppingList();
     if (!missing.length) {
@@ -211,31 +352,42 @@ function renderShoppingView(container) {
         groups[superOptimo].push(prod);
     });
 
+    // Paleta de colores por supermercado
+    const colorMap = {
+        MERCADONA:          'bg-emerald-800',
+        ALIMERKA:           'bg-amber-700',
+        LIDL:               'bg-blue-800',
+        ALDI:               'bg-cyan-800',
+        'POR DEFINIR / REVISAR': 'bg-rose-900',
+    };
+
     Object.entries(groups).forEach(([superName, items]) => {
         const block = document.createElement('div');
         block.className = 'bg-slate-800 rounded-xl border border-slate-700 overflow-hidden';
 
-        let headerBg = 'bg-slate-700';
-        if (superName === 'MERCADONA') headerBg = 'bg-emerald-800';
-        if (superName === 'ALIMERKA') headerBg = 'bg-amber-700';
-        if (superName === 'LIDL') headerBg = 'bg-blue-800';
-        if (superName === 'ALDI') headerBg = 'bg-cyan-800';
+        const headerBg = colorMap[superName] || 'bg-slate-700';
 
         block.innerHTML = `
       <div class="${headerBg} px-4 py-2 font-bold text-sm tracking-wide flex justify-between">
         <span>${superName}</span>
-        <span class="text-xs font-normal opacity-90">${items.length} productos</span>
+        <span class="text-xs font-normal opacity-90">${items.length} producto${items.length !== 1 ? 's' : ''}</span>
       </div>
       <div class="divide-y divide-slate-700/60 p-2">
         ${items.map(item => `
           <div class="py-2.5 px-2 flex justify-between items-center text-sm">
             <div>
               <div class="font-medium text-slate-200">${item.nombre}</div>
-              <div class="text-xs text-slate-400">Pref: ${item.super_forzado || 'Automático'}</div>
+              <div class="text-xs text-slate-400">
+                Pref: <span class="font-medium ${item.super_forzado ? 'text-indigo-400' : 'text-slate-500'}">${item.super_forzado || 'Automático'}</span>
+              </div>
             </div>
-            <button class="btn-prefer text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded border border-slate-600 active:scale-95 transition"
-                    data-id="${item.id_producto}">
-              Fijar Súper
+            <button class="btn-prefer text-xs px-3 py-1.5 rounded-lg border transition active:scale-95
+                           ${item.super_forzado
+                               ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300 hover:bg-indigo-600/30'
+                               : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}"
+                    data-id="${item.id_producto}"
+                    data-pref="${item.super_forzado || ''}">
+              ${item.super_forzado ? '✏️ Cambiar' : '📍 Fijar súper'}
             </button>
           </div>
         `).join('')}
@@ -243,16 +395,10 @@ function renderShoppingView(container) {
     `;
 
         block.querySelectorAll('.btn-prefer').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const prodId = e.target.dataset.id;
-                const choice = prompt('Introduce el nombre del súper preferido para este producto (MERCADONA, ALIMERKA, LIDL, ALDI) o déjalo vacío para automático por precio:');
-                if (choice !== null) {
-                    const upper = choice.trim().toUpperCase();
-                    await ApiService.updatePreference(prodId, upper, null);
-                    const p = Store.products.find(x => x.id_producto === prodId);
-                    if (p) p.super_forzado = upper;
-                    render();
-                }
+            btn.addEventListener('click', e => {
+                const prodId = e.currentTarget.dataset.id;
+                const currentPref = e.currentTarget.dataset.pref;
+                showSuperModal(prodId, currentPref);
             });
         });
 
