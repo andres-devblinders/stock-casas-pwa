@@ -33,6 +33,7 @@ async function loadInitialData() {
     try {
         const data = await ApiService.getInitialData();
         Store.setState({ houses: data.houses, products: data.products });
+        updateHouseTabs();
         render();
     } catch (err) {
         container.innerHTML = `<div class="text-center text-rose-400 py-8">${err.message}</div>`;
@@ -56,6 +57,7 @@ function setupEventListeners() {
         try {
             const data = await ApiService.login(url, user, pass);
             Store.setState({ houses: data.houses, products: data.products });
+            updateHouseTabs();
             showAppView();
             render();
         } catch (err) {
@@ -119,6 +121,19 @@ function updateNavButtons() {
         houseSelector.classList.add('hidden');
         title.textContent = 'Lista de la Compra';
     }
+}
+
+/**
+ * Actualiza el textContent de cada botón .tab-house con el nombre real de la
+ * casa leído desde Store.houses ("NOMBRE_CASA_1", "NOMBRE_CASA_2", ...).
+ * Si la clave no existe en la configuración, conserva el fallback "Casa N".
+ */
+function updateHouseTabs() {
+    document.querySelectorAll('.tab-house').forEach(btn => {
+        const houseNum = btn.dataset.house;
+        const name = Store.houses && Store.houses[`NOMBRE_CASA_${houseNum}`];
+        if (name) btn.textContent = name;
+    });
 }
 
 function render() {
