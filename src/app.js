@@ -125,13 +125,31 @@ function updateNavButtons() {
 
 /**
  * Actualiza el textContent de cada botón .tab-house con el nombre real de la
- * casa leído desde Store.houses ("NOMBRE_CASA_1", "NOMBRE_CASA_2", ...).
+ * casa leído desde Store.houses. Busca la clave de forma case-insensitive
+ * para ser robusto ante variaciones del Sheet (NOMBRE_CASA_1, nombre_casa_1…).
  * Si la clave no existe en la configuración, conserva el fallback "Casa N".
  */
 function updateHouseTabs() {
+    // Log de diagnóstico: muestra qué claves llegan realmente desde el Sheet
+    console.log('[updateHouseTabs] Store.houses =', JSON.stringify(Store.houses));
+
+    if (!Store.houses || !Object.keys(Store.houses).length) return;
+
+    // Construir un mapa con todas las claves en mayúsculas para búsqueda insensible
+    const housesUpper = {};
+    Object.entries(Store.houses).forEach(([k, v]) => {
+        housesUpper[k.toUpperCase().replace(/\s+/g, '_')] = v;
+    });
+
     document.querySelectorAll('.tab-house').forEach(btn => {
         const houseNum = btn.dataset.house;
-        const name = Store.houses && Store.houses[`NOMBRE_CASA_${houseNum}`];
+        // Intentar varias variantes de clave
+        const name =
+            housesUpper[`NOMBRE_CASA_${houseNum}`] ||
+            housesUpper[`CASA_${houseNum}`] ||
+            housesUpper[`NOMBRE_CASA${houseNum}`] ||
+            housesUpper[`HOUSE_${houseNum}`] ||
+            null;
         if (name) btn.textContent = name;
     });
 }
