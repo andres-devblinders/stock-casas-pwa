@@ -186,7 +186,11 @@ function renderShoppingView(container) {
     // Agrupar por supermercado óptimo
     const groups = {};
     missing.forEach(prod => {
-        const superOptimo = prod.super_optimo || 'POR_DEFINIR';
+        let superOptimo = prod.super_optimo;
+        // Si viene vacío o con error de fórmula (#¡VALOR!, #N/A, etc.)
+        if (!superOptimo || String(superOptimo).startsWith('#')) {
+            superOptimo = 'POR DEFINIR / REVISAR';
+        }
         if (!groups[superOptimo]) groups[superOptimo] = [];
         groups[superOptimo].push(prod);
     });
