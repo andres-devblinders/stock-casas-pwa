@@ -447,8 +447,9 @@ function renderTasksView(container) {
         startBtn.textContent = '...';
         try {
           const res = await ApiService.startTask(task.id_tarea);
+          // ¡Aquí estaba el detalle! Asignamos explícitamente ambos valores devueltos por el servidor:
           task.en_progreso_por = res.en_progreso_por || session.username;
-          task.inicio_timestamp = res.inicio_timestamp;
+          task.inicio_timestamp = res.inicio_timestamp; 
           render();
         } catch (err) {
           alert(err.message);
