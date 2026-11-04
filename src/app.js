@@ -288,6 +288,17 @@ function renderShoppingView(container) {
 }
 
 function renderTasksView(container) {
+
+  const owner = String(task.en_progreso_por || '').trim();
+  const timestamp = Number(task.inicio_timestamp || 0);
+    
+  // Está en progreso REAL solo si hay dueño Y tiene timestamp de inicio activo
+  const isProgress = Boolean(owner && timestamp > 0);
+  const isMine = isProgress && owner.toLowerCase() === currentUser;
+
+  // Si no está en curso, 'owner' pasa a ser simplemente el último usuario que la hizo
+  const lastUser = (!isProgress && owner) ? owner : 'Nadie';
+  
   if (!Store.tasks || !Store.tasks.length) {
     container.innerHTML = '<div class="text-center text-slate-400 py-8">No hay tareas registradas en la hoja Tareas.</div>';
     return;
@@ -430,6 +441,7 @@ function renderTasksView(container) {
             <span>⏱️ Media: <strong class="text-slate-200">${task.minutos || 0} min</strong></span>
             <span>· 🔄 Ejecuciones: <strong class="text-slate-200">${task.ejecuciones || 0}</strong></span>
             <span>· 📅 Próxima: <strong class="text-slate-200">${task.próxima || 'N/D'}</strong></span>
+            <span>· 👤 Último: <strong class="text-white">${lastUser}</strong></span>
           </div>
         </div>
         <div>
