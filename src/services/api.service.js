@@ -18,6 +18,7 @@ export const ApiService = {
     const response = await fetch(url, {
       method: 'POST',
       redirect: 'follow',
+      cache: 'no-store', // 👈 Forzar que nunca use caché en las peticiones de red
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'
       },
