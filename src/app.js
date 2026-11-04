@@ -293,89 +293,189 @@ function renderTasksView(container) {
     return;
   }
 
-  const session = AuthService.getSession();
-  const currentUser = String(session.username || '').trim().toLowerCase();
+  const currentUser = String(AuthService.getSession().username || '').trim().toLowerCase();
+  const todayStr = new Date().toISOString().split('T')[0]; // Fecha actual YYYY-MM-DD
 
-  Store.tasks.forEach(task => {
+  // 1. Enriquecer y clasificar cada tarea con su prioridad exacta
+  const processedTasks = Store.tasks.map(task => {
     const owner = String(task.en_progreso_por || '').trim();
-    const isFree = !owner;
+    const isProgress = Boolean(owner);
     const isMine = owner && owner.toLowerCase() === currentUser;
 
-    const card = document.createElement('div');
-    card.className = 'bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center gap-3';
-
-    let actionButtonHtml = '';
-    if (isFree) {
-      actionButtonHtml = `
-        <button class="btn-task-start bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg active:scale-95 transition whitespace-nowrap">
-          Iniciar tarea
-        </button>
-      `;
-    } else if (isMine) {
-      actionButtonHtml = `
-        <button class="btn-task-finish bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg active:scale-95 transition whitespace-nowrap animate-pulse">
-          Finalizar tarea
-        </button>
-      `;
-    } else {
-      actionButtonHtml = `
-        <button disabled class="bg-slate-700 text-slate-400 text-xs font-medium px-3.5 py-2 rounded-lg cursor-not-allowed whitespace-nowrap border border-slate-600">
-          En progreso...
-        </button>
-      `;
+    // Calcular días de diferencia con la fecha 'próxima' (columna G)
+    // proxDate - today: si es negativo, está vencida; si es 0, es hoy; si es positivo, es futura.
+    let diffDays = 0;
+    if (task.próxima) {
+      const taskDate = new Date(task.próxima);
+      const todayDate = new Date(todayStr);
+      diffDays = Math.round((taskDate - todayDate) / (1000 * 60 * 60 * 24));
     }
 
-    card.innerHTML = `
-      <div class="space-y-1">
-        <h4 class="font-semibold text-sm text-slate-100 capitalize">${task.tarea}</h4>
-        <div class="text-xs text-slate-400 flex flex-wrap gap-x-2 gap-y-0.5">
-          <span>📍 ${task.zona || 'General'}</span>
-          <span>· ⏱️ Media: <strong class="text-slate-200">${task.minutos || 0} min</strong></span>
-          <span>· 🔄 Ejecuciones: <strong class="text-slate-200">${task.ejecuciones || 0}</strong></span>
-        </div>
-        ${owner && !isMine ? `<div class="text-[11px] text-amber-400">Realizándola: ${owner}</div>` : ''}
+    // Definir prioridad numérica para el orden solicitado:
+    // Prioridad 1: En progreso por cualquier usuario
+    // Prioridad 2: Vencidas (diffDays < 0), ordenadas de mayor a menor días vencidos (más negativo primero)
+    // Prioridad 3: De hoy (diffDays === 0)
+    // Prioridad 4: Futuras (diffDays > 0), ordenadas de menor a mayor días restantes
+    let priority = 4;
+    let subSort = diffDays;
+
+    if (isProgress) {
+      priority = 1;
+    } else if (diffDays < 0) {
+      priority = 2;
+      subSort = diffDays; // Más negativo = más días vencida (queremos que aparezca antes o ordenadas de mayor retraso)
+    } else if (diffDays === 0) {
+      priority = 3;
+    } else {
+      priority = 4;
+      subSort = diffDays; // Menor días restantes primero
+    }
+
+    return {
+      ...task,
+      owner,
+      isProgress,
+      isMine,
+      diffDays,
+      priority,
+      subSort,
+      zona: String(task.zona || 'General').trim()
+    };
+  });
+
+  // 2. Ordenar globalmente según las reglas de negocio
+  processedTasks.sort((a, b) => {
+    if (a.priority !== b.priority) {
+      return a.priority - b.priority;
+    }
+    // Dentro de la misma prioridad, ordenar según el subcriterio
+    if (a.priority === 2) {
+      return a.subSort - b.subSort; // Las más vencidas (número más negativo) primero
+    }
+    if (a.priority === 4) {
+      return a.subSort - b.subSort; // Las que antes entran en escena (menor días) primero
+    }
+    return String(a.tarea).localeCompare(String(b.tarea));
+  });
+
+  // 3. Agrupar por bloques de ubicación (zona) manteniendo el orden de prioridad
+  const zoneGroups = {};
+  processedTasks.forEach(task => {
+    const zone = task.zona;
+    if (!zoneGroups[zone]) zoneGroups[zone] = [];
+    zoneGroups[zone].push(task);
+  });
+
+  // Renderizar los bloques por ubicación
+  container.innerHTML = '';
+  
+  Object.entries(zoneGroups).forEach(([zoneName, tasksInZone]) => {
+    const zoneSection = document.createElement('div');
+    zoneSection.className = 'space-y-2 mb-4';
+
+    // Cabecera de la ubicación
+    zoneSection.innerHTML = `
+      <div class="flex items-center justify-between bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-400">📍 ${zoneName}</h3>
+        <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">${tasksInZone.length} tareas</span>
       </div>
-      <div>
-        ${actionButtonHtml}
-      </div>
+      <div class="space-y-2" id="zone-cards-${zoneName.replace(/\s+/g, '-')}"></div>
     `;
 
-    const startBtn = card.querySelector('.btn-task-start');
-    if (startBtn) {
-      startBtn.addEventListener('click', async () => {
-        startBtn.disabled = true;
-        startBtn.textContent = 'Iniciando...';
-        try {
-          const res = await ApiService.startTask(task.id_tarea);
-          task.en_progreso_por = res.en_progreso_por || session.username;
-          task.inicio_timestamp = res.inicio_timestamp;
-          render();
-        } catch (err) {
-          alert(err.message);
-          await loadInitialData();
-        }
-      });
-    }
+    const cardsContainer = zoneSection.querySelector(`#zone-cards-${zoneName.replace(/\s+/g, '-')}`);
 
-    const finishBtn = card.querySelector('.btn-task-finish');
-    if (finishBtn) {
-      finishBtn.addEventListener('click', async () => {
-        finishBtn.disabled = true;
-        finishBtn.textContent = 'Guardando...';
-        try {
-          const res = await ApiService.finishTask(task.id_tarea);
-          task.minutos = res.minutos;
-          task.ejecuciones = res.ejecuciones;
-          task.en_progreso_por = '';
-          task.inicio_timestamp = '';
-          render();
-        } catch (err) {
-          alert(err.message);
-          await loadInitialData();
-        }
-      });
-    }
+    tasksInZone.forEach(task => {
+      let actionButtonHtml = '';
+      if (!task.isProgress) {
+        actionButtonHtml = `
+          <button class="btn-task-start bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition whitespace-nowrap">
+            Iniciar
+          </button>
+        `;
+      } else if (task.isMine) {
+        actionButtonHtml = `
+          <button class="btn-task-finish bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition whitespace-nowrap animate-pulse">
+            Finalizar
+          </button>
+        `;
+      } else {
+        actionButtonHtml = `
+          <button disabled class="bg-slate-700 text-slate-400 text-[11px] font-medium px-2.5 py-1.5 rounded-lg cursor-not-allowed whitespace-nowrap border border-slate-600">
+            En progreso (${task.owner})
+          </button>
+        `;
+      }
 
-    container.appendChild(card);
+      // Etiqueta visual de estado temporal (Vencida, Hoy, Futura o En curso)
+      let badgeHtml = '';
+      if (task.isProgress) {
+        badgeHtml = `<span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">En curso</span>`;
+      } else if (task.diffDays < 0) {
+        badgeHtml = `<span class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30">Vencida (${Math.abs(task.diffDays)}d)</span>`;
+      } else if (task.diffDays === 0) {
+        badgeHtml = `<span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30">Toca hoy</span>`;
+      } else {
+        badgeHtml = `<span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded">En ${task.diffDays}d</span>`;
+      }
+
+      const card = document.createElement('div');
+      card.className = 'bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center gap-2';
+      card.innerHTML = `
+        <div class="space-y-1 overflow-hidden">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h4 class="font-semibold text-sm text-slate-100 capitalize truncate">${task.tarea}</h4>
+            ${badgeHtml}
+          </div>
+          <div class="text-[11px] text-slate-400 flex flex-wrap gap-x-2">
+            <span>⏱️ Media: <strong class="text-slate-200">${task.minutos || 0} min</strong></span>
+            <span>· 🔄 Ejecuciones: <strong class="text-slate-200">${task.ejecuciones || 0}</strong></span>
+            <span>· 📅 Próxima: <strong class="text-slate-200">${task.próxima || 'N/D'}</strong></span>
+          </div>
+        </div>
+        <div>
+          ${actionButtonHtml}
+        </div>
+      `;
+
+      const startBtn = card.querySelector('.btn-task-start');
+      if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+          startBtn.disabled = true;
+          startBtn.textContent = '...';
+          try {
+            const res = await ApiService.startTask(task.id_tarea);
+            task.en_progreso_por = res.en_progreso_por || AuthService.getSession().username;
+            task.inicio_timestamp = res.inicio_timestamp;
+            render();
+          } catch (err) {
+            alert(err.message);
+            await loadInitialData();
+          }
+        });
+      }
+
+      const finishBtn = card.querySelector('.btn-task-finish');
+      if (finishBtn) {
+        finishBtn.addEventListener('click', async () => {
+          finishBtn.disabled = true;
+          finishBtn.textContent = '...';
+          try {
+            const res = await ApiService.finishTask(task.id_tarea);
+            task.minutos = res.minutos;
+            task.ejecuciones = res.ejecuciones;
+            task.en_progreso_por = '';
+            task.inicio_timestamp = '';
+            render();
+          } catch (err) {
+            alert(err.message);
+            await loadInitialData();
+          }
+        });
+      }
+
+      cardsContainer.appendChild(card);
+    });
+
+    container.appendChild(zoneSection);
   });
 }
