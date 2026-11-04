@@ -463,15 +463,10 @@ function renderTasksView(container) {
     if (finishBtn) {
       finishBtn.addEventListener('click', async () => {
         finishBtn.disabled = true;
-        finishBtn.textContent = '...';
+        finishBtn.textContent = 'Guardando...';
         try {
-          const res = await ApiService.finishTask(task.id_tarea);
-          task.minutos = res.minutos;
-          task.ejecuciones = res.ejecuciones;
-          task.próxima = res.próxima;
-          task.en_progreso_por = session.username;
-          task.inicio_timestamp = '';
-          render();
+          await ApiService.finishTask(task.id_tarea);
+          await loadInitialData(); // Recarga y repinta todo el store con los datos nuevos y ordenados
         } catch (err) {
           alert(err.message);
           await loadInitialData();
