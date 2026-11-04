@@ -297,11 +297,12 @@ function renderTasksView(container) {
   const currentUser = String(session.username || '').trim().toLowerCase();
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // 1. Procesar cada tarea y calcular su diferencia de días y prioridad estricta por vencimiento
+  // 1. Procesar cada tarea y calcular su diferencia de días y prioridad
   const processedTasks = Store.tasks.map(task => {
     const rawOwner = String(task.en_progreso_por || '').trim();
     const timestamp = Number(task.inicio_timestamp || 0);
 
+    // Comparación robusta en minúsculas para evitar fallos de mayúsculas
     const isProgress = Boolean(rawOwner && timestamp > 0);
     const isMine = isProgress && rawOwner.toLowerCase() === currentUser;
     const lastUser = (!isProgress && rawOwner) ? rawOwner : 'Nadie';
@@ -322,11 +323,7 @@ function renderTasksView(container) {
       diffDays = Math.round((taskDate - todayDate) / (1000 * 60 * 60 * 24));
     }
 
-    // Orden estricto prioritario por vencimiento:
-    // 1: En curso (si alguien la está haciendo, va primero)
-    // 2: Vencidas (diffDays < 0), ordenadas de mayor a menor retraso (más negativo primero)
-    // 3: De hoy (diffDays === 0)
-    // 4: Futuras (diffDays > 0), ordenadas de menor a mayor días restantes
+    // Prioridades: 1: En curso, 2: Vencidas, 3: Hoy, 4: Futuras
     let priority = 4;
     let subSort = diffDays;
 
@@ -334,12 +331,12 @@ function renderTasksView(container) {
       priority = 1;
     } else if (diffDays < 0) {
       priority = 2;
-      subSort = diffDays; // Ej: -5 va antes que -1
+      subSort = diffDays;
     } else if (diffDays === 0) {
       priority = 3;
     } else {
       priority = 4;
-      subSort = diffDays; // Ej: 1 día restante va antes que 5 días
+      subSort = diffDays;
     }
 
     return {
@@ -356,16 +353,16 @@ function renderTasksView(container) {
     };
   });
 
-  // 2. Ordenar globalmente por prioridad y estado de vencimiento (sin agrupar por zona)
+  // 2. Ordenar globalmente por prioridad y estado de vencimiento
   processedTasks.sort((a, b) => {
     if (a.priority !== b.priority) {
       return a.priority - b.priority;
     }
     if (a.priority === 2) {
-      return a.subSort - b.subSort; // Más vencidas primero (- más grande)
+      return a.subSort - b.subSort;
     }
     if (a.priority === 4) {
-      return a.subSort - b.subSort; // Futuras más cercanas primero
+      return a.subSort - b.subSort;
     }
     return String(a.tarea).localeCompare(String(b.tarea));
   });
@@ -376,27 +373,30 @@ function renderTasksView(container) {
 
   processedTasks.forEach(task => {
     let actionButtonHtml = '';
-    if (!task.isProgress) {
-      actionButtonHtml = `
-        <button class="btn-task-start bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition whitespace-nowrap">
-          Iniciar
-        </button>
-      `;
-    } else if (task.isMine) {
+    
+    // Si la tarea está en curso y es tuya, muestra el botón rojo de Finalizar
+    if (task.isProgress && task.isMine) {
       actionButtonHtml = `
         <button class="btn-task-finish bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition whitespace-nowrap animate-pulse">
           Finalizar
         </button>
       `;
-    } else {
+    } else if (task.isProgress && !task.isMine) {
+      // Si está en curso por otro usuario
       actionButtonHtml = `
         <button disabled class="bg-slate-700 text-slate-400 text-[11px] font-medium px-2.5 py-1.5 rounded-lg cursor-not-allowed whitespace-nowrap border border-slate-600">
           En curso (${task.rawOwner})
         </button>
       `;
+    } else {
+      // Si está libre
+      actionButtonHtml = `
+        <button class="btn-task-start bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg active:scale-95 transition whitespace-nowrap">
+          Iniciar
+        </button>
+      `;
     }
 
-    // Colores de la card según vencimiento: Roja si pasada, Verde si es hoy, Gris si es futura
     let cardBgColor = 'bg-slate-800 border-slate-700';
     let badgeHtml = '';
 
@@ -404,13 +404,13 @@ function renderTasksView(container) {
       cardBgColor = 'bg-amber-950/40 border-amber-600/50';
       badgeHtml = `<span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">En curso</span>`;
     } else if (task.diffDays < 0) {
-      cardBgColor = 'bg-rose-950/40 border-rose-600/50'; // Roja (vencida)
+      cardBgColor = 'bg-rose-950/40 border-rose-600/50';
       badgeHtml = `<span class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30">Vencida (${Math.abs(task.diffDays)}d)</span>`;
     } else if (task.diffDays === 0) {
-      cardBgColor = 'bg-emerald-950/40 border-emerald-600/50'; // Verde (hoy)
+      cardBgColor = 'bg-emerald-950/40 border-emerald-600/50';
       badgeHtml = `<span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">Toca hoy</span>`;
     } else {
-      cardBgColor = 'bg-slate-800 border-slate-700'; // Gris (futura)
+      cardBgColor = 'bg-slate-800 border-slate-700';
       badgeHtml = `<span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded">En ${task.diffDays}d</span>`;
     }
 
