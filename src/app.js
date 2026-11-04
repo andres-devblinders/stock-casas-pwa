@@ -445,20 +445,17 @@ function renderTasksView(container) {
     if (startBtn) {
       startBtn.addEventListener('click', async () => {
         startBtn.disabled = true;
-        startBtn.textContent = '...';
+        startBtn.textContent = 'Iniciando...';
         try {
-          const res = await ApiService.startTask(task.id_tarea);
-          // Actualizamos con el usuario normalizado de la sesión o el devuelto por la API
-          task.en_progreso_por = res.en_progreso_por || session.username;
-          task.inicio_timestamp = res.inicio_timestamp; 
-          render();
+          await ApiService.startTask(task.id_tarea);
+          await loadInitialData(); // Recarga los datos del servidor y repinta la vista al instante
         } catch (err) {
           alert(err.message);
           await loadInitialData();
         }
       });
     }
-
+    
     const finishBtn = card.querySelector('.btn-task-finish');
     if (finishBtn) {
       finishBtn.addEventListener('click', async () => {
