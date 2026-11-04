@@ -445,25 +445,43 @@ function renderTasksView(container) {
     if (startBtn) {
       startBtn.addEventListener('click', async () => {
         startBtn.disabled = true;
-        startBtn.textContent = 'Iniciando...';
+        startBtn.textContent = '...';
         try {
-          await ApiService.startTask(task.id_tarea);
-          await loadInitialData(); // Recarga los datos del servidor y repinta la vista al instante
+          const res = await ApiService.startTask(task.id_tarea);
+          
+          // Buscamos la tarea ORIGINAL en el Store para no mutar solo el clon de .map()
+          const originalTask = Store.tasks.find(t => String(t.id_tarea) === String(task.id_tarea));
+          if (originalTask) {
+            originalTask.en_progreso_por = res.en_progreso_por || session.username;
+            originalTask.inicio_timestamp = res.inicio_timestamp || Date.now();
+          }
+          
+          render(); // Repinta instantáneamente con los datos ya en memoria
         } catch (err) {
           alert(err.message);
           await loadInitialData();
         }
       });
     }
-    
+
     const finishBtn = card.querySelector('.btn-task-finish');
     if (finishBtn) {
       finishBtn.addEventListener('click', async () => {
         finishBtn.disabled = true;
-        finishBtn.textContent = 'Guardando...';
+        finishBtn.textContent = '...';
         try {
-          await ApiService.finishTask(task.id_tarea);
-          await loadInitialData(); // Recarga y repinta todo el store con los datos nuevos y ordenados
+          const res = await ApiService.finishTask(task.id_tarea);
+          
+          const originalTask = Store.tasks.find(t => String(t.id_tarea) === String(task.id_tarea));
+          if (originalTask) {
+            originalTask.minutos = res.minutos;
+            originalTask.ejecuciones = res.ejecuciones;
+            originalTask.próxima = res.próxima;
+            originalTask.en_progreso_por = res.ultimo_usuario || session.username;
+            originalTask.inicio_timestamp = '';
+          }
+          
+          render(); // Recoloca la tarjeta y cambia colores al instante sin recargar red
         } catch (err) {
           alert(err.message);
           await loadInitialData();
