@@ -456,13 +456,18 @@ function renderTasksView(container) {
     if (finishBtn) {
       finishBtn.addEventListener('click', async () => {
         finishBtn.disabled = true;
-        finishBtn.textContent = '...';
+        finishBtn.textContent = 'Guardando...';
         try {
           const res = await ApiService.finishTask(task.id_tarea);
+          
+          // Actualizamos la tarea en memoria con los datos devueltos por el backend
           task.minutos = res.minutos;
           task.ejecuciones = res.ejecuciones;
-          task.en_progreso_por = session.username;
-          task.inicio_timestamp = '';
+          task.próxima = res.próxima;
+          task.en_progreso_por = session.username; // Se queda guardado como último usuario
+          task.inicio_timestamp = ''; // Se limpia el timestamp para dejarla libre
+
+          // Forzamos un re-renderizado completo para que se reordene y cambie de color al instante
           render();
         } catch (err) {
           alert(err.message);
