@@ -304,6 +304,7 @@ function renderTasksView(container) {
 
     // Está en curso real si hay dueño Y un timestamp activo
     const isProgress = Boolean(rawOwner && timestamp > 0);
+    // Comparación robusta en minúsculas para asegurar que el usuario actual reconozca la tarea como suya
     const isMine = isProgress && (rawOwner.toLowerCase() === currentUser);
     const lastUser = (!isProgress && rawOwner) ? rawOwner : 'Nadie';
 
@@ -447,7 +448,7 @@ function renderTasksView(container) {
         startBtn.textContent = '...';
         try {
           const res = await ApiService.startTask(task.id_tarea);
-          // ¡Aquí estaba el detalle! Asignamos explícitamente ambos valores devueltos por el servidor:
+          // Actualizamos con el usuario normalizado de la sesión o el devuelto por la API
           task.en_progreso_por = res.en_progreso_por || session.username;
           task.inicio_timestamp = res.inicio_timestamp; 
           render();
