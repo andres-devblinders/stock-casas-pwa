@@ -46,7 +46,8 @@ async function loadInitialData() {
     Store.setState({
       houses: data.houses || {},
       products: data.products || [],
-      tasks: data.tasks || []
+      tasks: data.tasks || [],
+      users: data.users || []
     });
     updateHouseTabs();
     render();
@@ -74,7 +75,8 @@ function setupEventListeners() {
       Store.setState({
         houses: data.houses || {},
         products: data.products || [],
-        tasks: data.tasks || []
+        tasks: data.tasks || [],
+        users: data.users || []
       });
       updateHouseTabs();
       showAppView();
@@ -297,7 +299,66 @@ function renderTasksView(container) {
   const currentUser = String(session.username || '').trim().toLowerCase();
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // 1. Procesar cada tarea y calcular su diferencia de días y prioridad estricta por vencimiento
+  container.innerHTML = '';
+
+  // ==========================================
+  // WIDGET: Cabecera comparativa de tiempos
+  // ==========================================
+  const usersList = (Store.users || []).map(u => ({
+    usuario: String(u.usuario || '').trim(),
+    minutos: Number(u.minutos || 0)
+  }));
+
+  if (usersList.length > 0) {
+    // Ordenamos de mayor a menor minutos acumulados
+    usersList.sort((a, b) => b.minutos - a.minutos);
+
+    const leader = usersList[0];
+    const currentUserData = usersList.find(u => u.usuario.toLowerCase() === currentUser);
+    const myMinutes = currentUserData ? currentUserData.minutos : 0;
+    const isMeLeader = leader.usuario.toLowerCase() === currentUser;
+
+    let timeBannerHtml = '';
+
+    if (!isMeLeader) {
+      // El usuario actual NO es el líder -> mensaje en ROJO
+      const diff = Math.round((leader.minutos - myMinutes) * 10) / 10;
+      timeBannerHtml = `
+        <div class="bg-rose-950/40 border border-rose-600/50 text-rose-300 p-2.5 rounded-xl text-xs flex justify-between items-center mb-3">
+          <div class="flex items-center gap-1.5">
+            <span>⏱️</span>
+            <span><strong class="text-rose-200 capitalize">${leader.usuario}</strong> lleva <strong class="text-rose-100">${diff} min más</strong> que tú</span>
+          </div>
+          <span class="text-[11px] text-rose-400 font-mono">Tú: ${myMinutes}m | ${leader.usuario}: ${leader.minutos}m</span>
+        </div>
+      `;
+    } else {
+      // El usuario actual SÍ es el líder -> mensaje en VERDE
+      const second = usersList[1];
+      if (second) {
+        const diff = Math.round((leader.minutos - second.minutos) * 10) / 10;
+        timeBannerHtml = `
+          <div class="bg-emerald-950/40 border border-emerald-600/50 text-emerald-300 p-2.5 rounded-xl text-xs flex justify-between items-center mb-3">
+            <div class="flex items-center gap-1.5">
+              <span>🏆</span>
+              <span><strong class="text-emerald-200 capitalize">${second.usuario}</strong> lleva <strong class="text-emerald-100">${diff} min menos</strong> que tú</span>
+            </div>
+            <span class="text-[11px] text-emerald-400 font-mono">Tú: ${myMinutes}m | ${second.usuario}: ${second.minutos}m</span>
+          </div>
+        `;
+      } else {
+        timeBannerHtml = `
+          <div class="bg-emerald-950/40 border border-emerald-600/50 text-emerald-300 p-2.5 rounded-xl text-xs flex justify-between items-center mb-3">
+            <span>🏆 Vas en cabeza con ${myMinutes} minutos acumulados</span>
+          </div>
+        `;
+      }
+    }
+
+    container.insertAdjacentHTML('beforeend', timeBannerHtml);
+  }
+
+  // 1. Procesar cada tarea y calcular su diferencia de días y prioridad
   const processedTasks = Store.tasks.map(task => {
     const rawOwner = String(task.en_progreso_por || '').trim();
     const timestamp = Number(task.inicio_timestamp || 0);
@@ -322,7 +383,6 @@ function renderTasksView(container) {
       diffDays = Math.round((taskDate - todayDate) / (1000 * 60 * 60 * 24));
     }
 
-    // Prioridades: 1: En curso, 2: Vencidas, 3: Hoy, 4: Futuras
     let priority = 4;
     let subSort = diffDays;
 
@@ -366,7 +426,6 @@ function renderTasksView(container) {
     return String(a.tarea).localeCompare(String(b.tarea));
   });
 
-  container.innerHTML = '';
   const listWrapper = document.createElement('div');
   listWrapper.className = 'space-y-2';
 
@@ -475,6 +534,10 @@ function renderTasksView(container) {
             originalTask.en_progreso_por = res.ultimo_usuario || session.username;
             originalTask.inicio_timestamp = '';
             delete originalTask._justStartedByMe;
+          }
+
+          if (res.users) {
+            Store.setState({ users: res.users });
           }
 
           render();
